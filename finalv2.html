@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Password Strength & Crack Time</title>
+  <style>
+    :root{
+      --bg1:#0f1724; --bg2:#071033; --card:#0b1220;
+      --accent1:#7c3aed; --accent2:#06b6d4;
+      --good:#16a34a; --warn:#f59e0b; --bad:#ef4444; --muted:rgba(255,255,255,0.78);
+      --text:#e6eef8;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      select {
+        background-color: var(--card); /* Use card background for clarity */
+        color: var(--text);
+        /* This is key for the dropdown arrow color in some browsers */
+        -webkit-appearance: none; 
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23e6eef8'%3e%3cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd' /%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.7rem center;
+        background-size: 1.5em 1.5em;
+        padding-right: 2.5rem; /* Make room for the custom arrow */
+      }
+    
+        /* Ensure the options inside the dropdown also use dark mode colors */
+      select option {
+        background-color: var(--bg1);
+        color: var(--text);
+      }
+    }
+    :root[data-theme="light"]{
+      --bg1:#eef2f7; --bg2:#e6ebf3; --card:#e9edf3;
+      --accent1:#2563eb; --accent2:#22c55e; --good:#15803d; --warn:#b45309; --bad:#dc2626;
+      --muted:rgba(9,12,20,0.7); --text:#0b1220;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:
+      radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.12), transparent),
+      linear-gradient(180deg,var(--bg1),var(--bg2)); color:var(--text)}
+    .wrap{max-width:1100px;margin:36px auto;padding:24px}
+    
+    /* Header */
+    header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+    .brand{display:flex;gap:14px;align-items:center}
+    .logo{width:52px;height:52px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent1),var(--accent2));border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+    h1{margin:0;font-size:22px;letter-spacing:-0.5px}
+    p.lead{margin:4px 0 0;color:var(--muted);font-size:14px;max-width:600px}
+    
+    /* Layout */
+    .layout{display:grid;grid-template-columns:1.3fr 0.9fr;gap:24px;margin-top:28px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      padding:24px;border-radius:16px;border:1px solid rgba(255,255,255,0.06);box-shadow:0 4px 20px rgba(0,0,0,0.1)}
+    .card h3{margin:0 0 12px 0;font-size:16px;font-weight:600}
+
+    /* Form Elements */
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:8px;font-weight:500}
+    .row{display:flex;gap:10px;align-items:center}
+    input[type=text], input[type=password], select{
+      flex:1;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);
+      background:rgba(255,255,255,0.04);color:var(--text);font-size:16px;outline:none;
+      transition:border-color .2s, background .2s}
+    input:focus, select:focus{border-color:var(--accent1);background:rgba(255,255,255,0.08)}
+    button.btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+      padding:10px 14px;border-radius:8px;color:var(--text);cursor:pointer;font-weight:500;transition:all .2s}
+    button.btn:hover{background:rgba(255,255,255,0.08);border-color:var(--text)}
+    .icon-btn{width:46px;padding:0;display:grid;place-items:center;font-size:18px}
+    
+    /* Threat Model Toggle */
+    .threat-toggle{display:flex;background:rgba(0,0,0,0.2);border-radius:10px;padding:4px;margin-bottom:14px}
+    .threat-opt{flex:1;text-align:center;padding:8px;font-size:13px;cursor:pointer;border-radius:8px;color:var(--muted);background:transparent;transition:all .2s;border:1px solid transparent}
+    .threat-opt:hover{color:var(--text)}
+    .threat-opt[aria-pressed="true"]{background:var(--card);color:var(--text);font-weight:600;border-color:rgba(255,255,255,0.1);box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+
+    /* Meter */
+    .meter-wrap{margin-top:8px}
+    .meter{height:12px;background:rgba(255,255,255,0.08);border-radius:6px;overflow:hidden;position:relative}
+    .meter>i{position:absolute;left:0;top:0;bottom:0;width:0%;background:var(--bad);
+      transition:width .4s cubic-bezier(.2,.9,.3,1), background .4s}
+    
+    /* Status & Badges */
+    .status{display:flex;justify-content:space-between;align-items:flex-end;margin-top:16px}
+    .bits-box{display:flex;flex-direction:column;gap:2px}
+    .bits{font-weight:800;font-size:28px;line-height:1}
+    .rating-badge{padding:6px 12px;border-radius:6px;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:0.5px}
+    .badge-bad{background:rgba(239,68,68,0.2);color:var(--bad)}
+    .badge-warn{background:rgba(245,158,11,0.2);color:var(--warn)}
+    .badge-good{background:rgba(22,163,74,0.2);color:var(--good)}
+
+    /* Analysis List */
+    .analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+    .check-item{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);padding:8px;background:rgba(255,255,255,0.03);border-radius:8px}
+    .dot{width:10px;height:10px;border-radius:50%;background:rgba(128,128,128,0.4);flex-shrink:0}
+    
+    /* Tables */
+    .attacker-table{width:100%;border-collapse:collapse;margin-top:4px}
+    .attacker-table td, .attacker-table th{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);text-align:left;font-size:14px}
+    .attacker-table th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-0.5px}
+
+    /* Utils */
+    .chip{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;background:rgba(255,255,255,0.1);margin-right:4px}
+    .mt{margin-top:16px}
+    .hidden{display:none}
+
+    /* Light Theme Overrides */
+    :root[data-theme="light"] .card{background:#fff;border-color:rgba(0,0,0,0.08);box-shadow:0 8px 30px rgba(0,0,0,0.06)}
+    :root[data-theme="light"] .threat-toggle{background:rgba(0,0,0,0.06)}
+    :root[data-theme="light"] input, :root[data-theme="light"] select{background:#fff;border-color:#d1d5db;color:#1f2937}
+    :root[data-theme="light"] .btn{background:#fff;border-color:#d1d5db;color:#374151}
+    :root[data-theme="light"] .btn:hover{background:#f3f4f6}
+
+    /* Footer / Disclaimer */
+    footer{margin-top:30px;padding:20px;text-align:center;font-size:12px;color:var(--muted)}
+
+    @media (max-width:900px){.layout{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Password Strength</h1>
+        <p class="lead">Pattern-aware entropy, spatial walk detection, and realistic attack times.</p>
+      </div>
+    </div>
+    <button id="themeToggle" class="btn">Toggle Theme</button>
+  </header>
+
+  <div class="layout">
+    <main>
+      <div class="card">
+        <div class="threat-toggle" role="radiogroup" aria-label="Threat Model">
+          <button class="threat-opt" id="tm-online" aria-pressed="true">
+            ☁️ Online Attack<br><span style="font-size:10px;opacity:0.7">Rate-limited, guessed over internet</span>
+          </button>
+          <button class="threat-opt" id="tm-offline" aria-pressed="false">
+            💻 Offline Crack<br><span style="font-size:10px;opacity:0.7">Fast GPU hash attack (Stolen DB)</span>
+          </button>
+        </div>
+
+        <label for="pw">Test Password (k-anonymity privacy protected)</label>
+        <div class="row">
+          <input id="pw" type="password" placeholder="Type to analyze..." autocomplete="new-password">
+          <button id="togglePw" class="btn icon-btn" title="Show/Hide">👁️</button>
+          <button id="clear" class="btn">Clear</button>
+        </div>
+
+        <div class="meter-wrap">
+          <div class="meter"><i id="meterbar"></i></div>
+        </div>
+
+        <div class="status">
+          <div class="bits-box">
+            <div id="entropy" class="bits">0 bits</div>
+            <div id="crackTime" style="font-size:13px;color:var(--muted)">Instant crack</div>
+          </div>
+          <div id="rating" class="rating-badge badge-bad">Very Weak</div>
+        </div>
+
+        <div class="analysis-grid">
+          <div class="check-item"><span class="dot" id="d1"></span> <span id="c1">Breach status unknown</span></div>
+          <div class="check-item"><span class="dot" id="d2"></span> <span id="c2">Pattern analysis</span></div>
+          <div class="check-item"><span class="dot" id="d3"></span> <span id="c3">Dictionary check</span></div>
+          <div class="check-item"><span class="dot" id="d4"></span> <span id="c4">Keyboard walk check</span></div>
+        </div>
+      </div>
+
+      <div class="card mt">
+        <h3>Passphrase Generator</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Creates strong, memorable passwords.</p>
+        <div class="row">
+          <button id="gen" class="btn" style="color:var(--accent2);border-color:var(--accent2)">Generate</button>
+          <input id="genOut" class="mono" type="text" readonly style="letter-spacing:1px">
+        </div>
+      </div>
+    </main>
+
+    <aside>
+      <div class="card">
+        <h3>Attack Scenarios</h3>
+        <div class="row" style="margin-bottom:12px">
+          <select id="kdf" aria-label="Hash Algorithm">
+            <option value="fast">MD5 / SHA-1 (Fast)</option>
+            <option value="bcrypt10">bcrypt (Cost 10)</option>
+            <option value="bcrypt12" selected>bcrypt (Cost 12)</option>
+            <option value="argon">Argon2id (Memory Hard)</option>
+          </select>
+        </div>
+        <table class="attacker-table">
+          <thead><tr><th>Scenario</th><th>Speed</th><th>Time</th></tr></thead>
+          <tbody>
+            <tr><td>Online (Botnet)</td><td class="mono">1k/s</td><td id="t_botnet">—</td></tr>
+            <tr><td>Offline (GPU)</td><td class="mono" id="s_gpu">10 MH/s</td><td id="t_gpu">—</td></tr>
+            <tr><td>Offline (Cluster)</td><td class="mono" id="s_cluster">10 GH/s</td><td id="t_cluster">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card mt">
+        <h3>Privacy & Method</h3>
+        <ul style="margin:0 0 0 16px;padding:0;font-size:13px;color:var(--muted);line-height:1.6">
+          <li><b>Local Logic:</b> All pattern detection happens in JS. No password text leaves your device.</li>
+          <li><b>K-Anonymity:</b> We check breaches via HIBP API sending only the first 5 chars of the SHA-1 hash.</li>
+          <li><b>Entropy:</b> Calculated using a spatial tokenizer that detects dictionary words, keyboard walks (e.g., 'qazwsx'), and dates.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<footer>
+    This tool is client-side only. Your password never leaves your browser.
+  </footer>
+</div>
+
+<script>
+// ==========================================
+// 1. DATASETS & CONFIG
+// ==========================================
+
+// Top ~500 common words/passwords (Compressed String for Single File Efficiency)
+const COMMON_STR = "password 123456 123456789 12345678 qwerty 12345 111111 1234567 123123 987654321 welcome dragon baseball monkey football shadow mustang master michael jordan superman princess soccer iloveyou killer batman charlie cookie hunter peanut daniel thomas jessica ashley lauren joshua matthew andrew justin dragon1 secret freedom starwars systems harley flower summer winter autumn spring bailey brandy brenda broken butter camper cannon canyon carpet castle casual center chance change charge cheese cherry chester chicken church circle citizen classic clover coffee combat comedy common corner cotton county cousin cream creek crystal cycle dallas dance danger dealer degree delta dennis desert design desire detroit dinner doctor dollar double driver eagle eastern edward effect either eleven empire energy engine enough entire escape estate eugene fabric factor falcon family famous farmer father fellow female fence field figure finger finish fisher flavor flight floor focus forest format former foster frame frank friday fridge friend frost future garden garlic gather george global glory golden gospel grace graham grand grass great green ground guitar hammer handle harbor harry hawaii health heavy hello henry hero hidden higher hollow honest honey honor horse hotel house human humble humor hunter image impact income indian inner input insect inside island issue item jacket jacob james japan jerry jesus jewel joint jones jordan joseph judge junior justin kelly kevin killer king labor ladder lady lake large laser later laugh layer leader lemon level lewis light limit linda linear liquid listen little liver living lobby local logic loose louis lovely lover lower loyal lucky lunch machine magic major maker makeup male manage manual maple march maria marie mark market martin master match matter mayor media member memory mental mercy metal meter method metro mexico michael middle might miller million minor minute mirror mobile model modern moment monday money monica monkey month moon moore moral morgan morning mother motion motor mount mouse mouth movie music naked nancy native nature nelson never news night noise north novel nurse object ocean office olive olivia omega onion online only open opera option orange order organ origin other outer owner pace page paint panel panic paper parade parent paris parker party pass patrick paul peace peach pearl pedal penny people pepper perfect person peter phase phone photo piano pick pilot pizza place plain plan plane planet plant plate play plaza please pocket poem point polar pole police policy pond pony pool poor port post potato pound power press price pride prime prince print prize probe profit prone proof proper proud prove public pull pulse pump punch puppy pure push queen quest quick quiet quit quota rabbit race radar radio rail rain raise rally ranch range rapid rare rate ratio ray reach react read ready real rear reason rebel recall recipe record red reed reel refer region relay rely remain remote remove repair repeat report rescue result return reveal review reward rich ride ridge right ring rise risk ritual river road roast robert rock rocket roger roll romance roof room root rope rose rough round route royal rubber ruby ruin rule run rural rush russell ryan sacred saddle safe safety saint salad salary sale salmon salt same sample sand sarah sauce save scale scan scare scene scent scheme school science scope score screen script sea seal search season seat second secret section sector secure seed seek self sell send senior sense sensor series serve service set seven shade shadow shake shall shame shape share sharp she sheep sheet shelf shell shield shift shine ship shirt shock shoe shoot shop shore short shot should show side sight sign signal silent silver simon simple since sing single sister site six size skill skin skirt sky sleep slide slight slim slip slow small smart smell smile smith smoke smooth snake snap snow soap soccer social society soft soil solar sold sole solid solve some son song soon sorry sort sound soup south space spain span spare spark speak special speed spell spend spice spike spin spirit split sport spot spray spread spring spy square stable stack staff stage stair stamp stand star start state station stay steak steal steam steel step stick still stock stone stop store storm story stove street strike string strip strong struct stud stuff style subject subtle subway success such sugar suit summer sun super supply sure surface surge surprise susan sweet swim swing switch symbol system table tackle tail take tale talk tall tank tap target taste taxi tea teach team tear tech tell tennis term test text than thank that the their them then there these they thick thin thing think third this those though thought thread threat three through throw thumb thunder ticket tide tie tiger tight till time tin tiny tip tire title to toast today toe together told tom tone tongue tool tooth top topic total touch tour towel tower town toy track trade trail train trait tram trap travel tray treat tree trek trial tribe trick trip troop trouble truck true trump trunk trust truth try tube tune tunnel turkey turn twelve twenty twice twin twist two type typical ugly uncle under union unit unit universe until upper urban urge usage use user usual vacuum valid valley value van vapor variable vast vault vector vehicle veil vein velvet vendor venture venue verb verify verse version vessel via vice victim view village vincent vintage violet viral virus vision visit visual vital vocal voice void volt volume vote voyage wage wagon wait wake walk wall wander want war warm warn wash watch water wave way we weak wealth weapon wear weather weave web wednesday week weigh weight weird welcome well west western wet whale what wheat wheel when where which while white who whole why wide widow width wife wild will win wind window wine wing winner winter wipe wire wisdom wise wish with witness wolf woman wonder wood wool word work world worry worth wound wrap write wrong yard year yellow yes yet yield you young your youth zero zone zoom";
+const DICT = new Set(COMMON_STR.split(" "));
+
+// Spatial Adjacency Graph (for keyboard walks)
+const ADJ = {
+  '1':'2q', '2':'13qw', '3':'24we', '4':'35er', '5':'46rt', '6':'57ty', '7':'68yu', '8':'79ui', '9':'80io', '0':'9op',
+  'q':'12wa', 'w':'qase23', 'e':'wsdr34', 'r':'edft45', 't':'rfgy56', 'y':'tghu67', 'u':'yhji78', 'i':'ujko89', 'o':'iklp90', 'p':'ol0',
+  'a':'qwsz', 's':'qweadzx', 'd':'ersfcx', 'f':'rtdgvcb', 'g':'tyfhbv', 'h':'yugjbn', 'j':'uihknm', 'k':'iojlm', 'l':'opk',
+  'z':'asx', 'x':'zsdc', 'c':'xdfv', 'v':'cfgb', 'b':'vghn', 'n':'bhjm', 'm':'njk'
+};
+
+// ==========================================
+// 2. CORE LOGIC (TOKENIZER & ENTROPY)
+// ==========================================
+
+const log2 = x => Math.log(x)/Math.log(2);
+
+// Check if string is a keyboard walk (e.g. "qwer", "zaq1")
+function getWalkLength(str) {
+  if (!str || str.length < 3) return 0;
+  let maxRun = 0, currentRun = 1;
+  const s = str.toLowerCase();
+  for (let i = 0; i < s.length - 1; i++) {
+    const c1 = s[i], c2 = s[i+1];
+    if (ADJ[c1] && ADJ[c1].includes(c2)) currentRun++;
+    else { maxRun = Math.max(maxRun, currentRun); currentRun = 1; }
+  }
+  return Math.max(maxRun, currentRun);
+}
+
+// Tokenizer & Entropy Calculator
+function calculateEntropy(pw) {
+  if (!pw) return 0;
+  
+  let entropy = 0;
+  let len = pw.length;
+  let i = 0;
+  
+  // Trackers for badges
+  let hasDict = false, hasWalk = false, hasYear = false;
+
+  while (i < len) {
+    const remaining = pw.slice(i);
+    
+    // 1. Check Date (4 digits, 1900-2029)
+    if (/^(19|20)\d{2}/.test(remaining)) {
+      entropy += 7; // log2(130 years) approx
+      i += 4; hasYear = true; continue;
+    }
+
+    // 2. Check Dictionary Word (Greedy match, min 4 chars)
+    let bestWord = "";
+    for (let j = Math.min(remaining.length, 12); j >= 4; j--) {
+      const sub = remaining.slice(0, j).toLowerCase();
+      if (DICT.has(sub)) { bestWord = sub; break; }
+    }
+    if (bestWord) {
+      entropy += 12; // Fixed cost for common word (~log2(4000))
+      i += bestWord.length; hasDict = true; continue;
+    }
+
+    // 3. Check Keyboard Walk (min 3 chars)
+    // We check if the next 3+ chars form a walk
+    let walkLen = 0;
+    // Look ahead to find max walk from current pos
+    let run = 1;
+    let k = 0;
+    while(i+k < len-1) {
+      const c1 = pw[i+k].toLowerCase();
+      const c2 = pw[i+k+1].toLowerCase();
+      if (ADJ[c1] && ADJ[c1].includes(c2)) { run++; k++; }
+      else break;
+    }
+    if (run >= 3) {
+      // 1 bit per step for walks + 5 bits starting cost
+      entropy += 5 + (run - 1); 
+      i += run; hasWalk = true; continue;
+    }
+
+    // 4. Check Repeats (aaa)
+    if (remaining.length >= 3 && remaining[0] === remaining[1] && remaining[1] === remaining[2]) {
+      let r = 1; while(i+r < len && pw[i+r]===pw[i]) r++;
+      entropy += 3 + (r-1); // Cheap entropy for repeats
+      i += r; continue;
+    }
+
+    // 5. Brute Force (Single Char)
+    let pool = 0;
+    const char = pw[i];
+    if (/[a-z]/.test(char)) pool = 26;
+    else if (/[A-Z]/.test(char)) pool = 26;
+    else if (/[0-9]/.test(char)) pool = 10;
+    else pool = 32; // symbols
+    
+    entropy += log2(pool);
+    i++;
+  }
+
+  return { entropy: Math.round(entropy), hasDict, hasWalk, hasYear };
+}
+
+// ==========================================
+// 3. UI & INTERACTION
+// ==========================================
+
+const el = id => document.getElementById(id);
+let isOnlineThreat = true; // Default
+
+// Refs
+const pwIn = el('pw');
+const meterBar = el('meterbar');
+const entropyEl = el('entropy');
+const ratingEl = el('rating');
+const crackTimeEl = el('crackTime');
+const checks = { d1:el('d1'), c1:el('c1'), d2:el('d2'), c2:el('c2'), d3:el('d3'), c3:el('c3'), d4:el('d4'), c4:el('c4') };
+
+// Threat Model Toggles
+el('tm-online').addEventListener('click', ()=>{ setThreat(true); });
+el('tm-offline').addEventListener('click', ()=>{ setThreat(false); });
+
+function setThreat(isOnline){
+  isOnlineThreat = isOnline;
+  el('tm-online').setAttribute('aria-pressed', isOnline);
+  el('tm-offline').setAttribute('aria-pressed', !isOnline);
+  updateUI();
+}
+
+// Input Handler
+pwIn.addEventListener('input', updateUI);
+el('clear').addEventListener('click', ()=>{ pwIn.value=''; updateUI(); pwIn.focus(); });
+
+// HIBP Logic
+async function checkBreach(password){
+  if(!password) return 0;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const prefix = hashHex.slice(0, 5);
+  const suffix = hashHex.slice(5);
+
+  try {
+    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+    const text = await res.text();
+    const match = text.split('\n').find(line => line.startsWith(suffix));
+    return match ? parseInt(match.split(':')[1]) : 0;
+  } catch (e) { return -1; } // Network error
+}
+
+let debounceTimer;
+function updateUI(){
+  const val = pwIn.value;
+  if(!val) resetUI(); 
+  else {
+    // 1. Local Calculation
+    const stats = calculateEntropy(val);
+    const bits = stats.entropy;
+    
+    // 2. Update Meter & Badges
+    entropyEl.textContent = `${bits} bits`;
+    
+    // Thresholds differ by Threat Model
+    // Online: 40 bits is OK (throttled). Offline: 40 bits is dead in seconds.
+    let score = 0; // 0=Bad, 1=Warn, 2=Good
+    if (isOnlineThreat) {
+        if(bits > 50) score=2; else if(bits > 30) score=1; else score=0;
+    } else {
+        if(bits > 75) score=2; else if(bits > 50) score=1; else score=0;
+    }
+
+    const colors = ['var(--bad)', 'var(--warn)', 'var(--good)'];
+    const ratings = ['Very Weak', 'Moderate', 'Strong'];
+    const badges = ['badge-bad', 'badge-warn', 'badge-good'];
+
+    meterBar.style.width = `${Math.min(100, (bits / (isOnlineThreat?80:128))*100)}%`;
+    meterBar.style.background = colors[score];
+    ratingEl.className = `rating-badge ${badges[score]}`;
+    ratingEl.textContent = ratings[score];
+
+    // 3. Update Analysis Dots
+    // Pattern
+    checks.c2.textContent = `Pattern: ${stats.hasYear?'Year found':''} ${stats.hasDict?'Dictionary word':''} ${stats.hasWalk?'Keyboard walk':''}`;
+    if(!stats.hasYear && !stats.hasDict && !stats.hasWalk) checks.c2.textContent = "No obvious patterns";
+    checks.d2.style.background = (stats.hasYear||stats.hasDict||stats.hasWalk) ? 'var(--warn)' : 'var(--good)';
+
+    // Dictionary Specific
+    checks.c3.textContent = stats.hasDict ? 'Common dictionary word found' : 'No common words found';
+    checks.d3.style.background = stats.hasDict ? 'var(--bad)' : 'var(--good)';
+
+    // Walk Specific
+    checks.c4.textContent = stats.hasWalk ? 'Keyboard sequence detected' : 'No keyboard walks';
+    checks.d4.style.background = stats.hasWalk ? 'var(--warn)' : 'var(--good)';
+
+    // 4. Update Times Table
+    const guesses = Math.pow(2, bits);
+    const kdf = el('kdf').value;
+    // Rough Hash Rates
+    const speeds = { 
+        'fast': 1e10, // MD5 GPU
+        'bcrypt10': 100000, 
+        'bcrypt12': 25000, 
+        'argon': 10000
+    };
+    const gpuSpeed = speeds[kdf] || 10000;
+    
+    el('t_botnet').textContent = humanTime(guesses / 1000); // 1k/sec online
+    el('t_gpu').textContent = humanTime(guesses / gpuSpeed);
+    el('t_cluster').textContent = humanTime(guesses / (gpuSpeed * 1000));
+    
+    el('s_gpu').textContent = kdf==='fast' ? '10 GH/s' : (gpuSpeed/1000).toFixed(1)+' kH/s';
+    el('s_cluster').textContent = kdf==='fast' ? '10 TH/s' : (gpuSpeed).toFixed(1)+' kH/s';
+    
+    // Main Time Label
+    const mainTime = isOnlineThreat ? (guesses/1000) : (guesses/gpuSpeed);
+    crackTimeEl.textContent = `Est. time to crack: ${humanTime(mainTime)}`;
+
+    // 5. Async Breach Check (Debounced)
+    checks.c1.textContent = "Checking..."; checks.d1.style.background = '#888';
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+        const hits = await checkBreach(val);
+        if(hits === -1) {
+            checks.c1.textContent = "Offline / API Error";
+            checks.d1.style.background = 'var(--muted)';
+        } else if(hits > 0) {
+            checks.c1.textContent = `Compromised! Found ${hits.toLocaleString()} times`;
+            checks.d1.style.background = 'var(--bad)';
+            // Force rating down if compromised
+            ratingEl.textContent = "COMPROMISED";
+            ratingEl.className = "rating-badge badge-bad";
+            meterBar.style.background = "var(--bad)";
+        } else {
+            checks.c1.textContent = "Not found in public breaches";
+            checks.d1.style.background = 'var(--good)';
+        }
+    }, 500);
+  }
+}
+
+function resetUI(){
+    meterBar.style.width='0%'; entropyEl.textContent='0 bits';
+    ratingEl.textContent='READY'; ratingEl.className='rating-badge'; ratingEl.style.background='rgba(255,255,255,0.1)'; ratingEl.style.color='var(--text)';
+    crackTimeEl.textContent='—';
+    Object.values(checks).forEach(e => { if(e.className==='dot') e.style.background='rgba(128,128,128,0.4)'; else if(e.id.startsWith('c')) e.textContent='...'; });
+    checks.c1.textContent='Breach status unknown'; checks.c2.textContent='Pattern analysis';
+    checks.c3.textContent='Dictionary check'; checks.c4.textContent='Keyboard walk check';
+}
+
+function humanTime(seconds) {
+  if (seconds < 1) return "Instant";
+  const units = [
+    ["year", 31536000], ["month", 2592000], ["day", 86400], 
+    ["hour", 3600], ["minute", 60], ["second", 1]
+  ];
+  for (const [name, sec] of units) {
+    const val = Math.floor(seconds / sec);
+    if (val >= 1) return `${val} ${name}${val>1?'s':''}`;
+  }
+  return "Instant";
+}
+
+// Passphrase Generator (Correct Horse Battery Staple)
+const GEN_WORDS = Array.from(DICT).filter(w => w.length > 3 && w.length < 9);
+el('gen').addEventListener('click', () => {
+    const w = [];
+    for(let i=0; i<4; i++) w.push( GEN_WORDS[Math.floor(Math.random() * GEN_WORDS.length)] );
+    const pass = w.join('-');
+    el('genOut').value = pass;
+    pwIn.value = pass;
+    updateUI();
+});
+
+// Toggle Password
+el('togglePw').addEventListener('click', () => {
+    const type = pwIn.getAttribute('type') === 'password' ? 'text' : 'password';
+    pwIn.setAttribute('type', type);
+});
+
+// Theme Logic
+const themeBtn = el('themeToggle');
+const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+document.documentElement.setAttribute('data-theme', savedTheme);
+themeBtn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+});
+
+// Listen to drop downs
+el('kdf').addEventListener('change', updateUI);
+
+</script>
+</body>
+</html>
